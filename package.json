@@ -34,9 +34,13 @@
   "author": "Ayush",
   "license": "ISC",
   "devDependencies": {
+    "@types/amqplib": "^0.10.8",
+    "@types/ioredis": "^4.28.10",
     "prisma": "5.19.1"
   },
   "dependencies": {
-    "@prisma/client": "5.19.1"
+    "@prisma/client": "5.19.1",
+    "amqplib": "^2.2.0",
+    "ioredis": "^6.0.0"
   }
 }

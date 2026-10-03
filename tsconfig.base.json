@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "node",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -25,6 +27,24 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@prisma/client-auth": [
+        "services/auth-service/src/generated/client"
+      ],
+      "@prisma/client-catalog": [
+        "services/catalog-service/src/generated/client"
+      ],
+      "@prisma/client-order": [
+        "services/order-service/src/generated/client"
+      ],
+      "@prisma/client-inventory": [
+        "services/inventory-service/src/generated/client"
+      ],
+      "@prisma/client-payment": [
+        "services/payment-service/src/generated/client"
+      ]
+    }
   }
 }

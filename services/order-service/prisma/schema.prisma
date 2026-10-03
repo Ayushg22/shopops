@@ -5,11 +5,36 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../../../node_modules/@prisma/client-order"
 }
 
-// Model placeholder for order-service
-model Entity {
+enum OrderStatus {
+  PENDING
+  RESERVED
+  PAID
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  customerId  String
+  totalAmount Float
+  status      OrderStatus @default(PENDING)
+  items       OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
   id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  quantity  Int
+  unitPrice Float
+
+  @@map("order_items")
 }

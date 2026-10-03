@@ -8,7 +8,6 @@ const logger = new Logger(config.serviceName);
 const app = express();
 
 app.use(cors());
-// Note: We avoid global express.json() before proxying so streaming request bodies pass cleanly
 app.use(createHttpLoggingMiddleware(logger));
 
 // Correlation ID & Security Headers
@@ -19,24 +18,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Proxy routes to Microservices
-app.use(
-  '/api/v1/auth',
-  createProxyMiddleware({
-    target: config.authServiceUrl,
-    changeOrigin: true,
-    pathRewrite: (path) => `/api/v1/auth${path}`
-  })
-);
-
-app.use(
-  '/api/v1/catalog',
-  createProxyMiddleware({
-    target: config.catalogServiceUrl,
-    changeOrigin: true,
-    pathRewrite: (path) => `/api/v1/catalog${path}`
-  })
-);
+// Proxy routes to all Microservices (using pathFilter to preserve exact URLs without Express route stripping)
+app.use(createProxyMiddleware({ target: config.authServiceUrl, changeOrigin: true, pathFilter: '/api/v1/auth' }));
+app.use(createProxyMiddleware({ target: config.catalogServiceUrl, changeOrigin: true, pathFilter: '/api/v1/catalog' }));
+app.use(createProxyMiddleware({ target: config.orderServiceUrl, changeOrigin: true, pathFilter: '/api/v1/orders' }));
+app.use(createProxyMiddleware({ target: config.inventoryServiceUrl, changeOrigin: true, pathFilter: '/api/v1/inventory' }));
+app.use(createProxyMiddleware({ target: config.paymentServiceUrl, changeOrigin: true, pathFilter: '/api/v1/payments' }));
+app.use(createProxyMiddleware({ target: config.notificationServiceUrl, changeOrigin: true, pathFilter: '/api/v1/notifications' }));
 
 // Probes
 app.get('/health/live', (_req: Request, res: Response) => {
@@ -49,7 +37,11 @@ app.get('/health/ready', (_req: Request, res: Response) => {
     service: config.serviceName,
     targets: {
       auth: config.authServiceUrl,
-      catalog: config.catalogServiceUrl
+      catalog: config.catalogServiceUrl,
+      order: config.orderServiceUrl,
+      inventory: config.inventoryServiceUrl,
+      payment: config.paymentServiceUrl,
+      notification: config.notificationServiceUrl
     }
   });
 });

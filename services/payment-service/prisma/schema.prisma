@@ -5,11 +5,22 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../../../node_modules/@prisma/client-payment"
 }
 
-// Model placeholder for payment-service
-model Entity {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  orderId        String        @unique
+  amount         Float
+  status         PaymentStatus @default(PENDING)
+  transactionRef String?
+  createdAt      DateTime      @default(now())
+
+  @@map("payments")
 }

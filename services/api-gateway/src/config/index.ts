@@ -12,7 +12,8 @@ const configSchema = z.object({
   catalogServiceUrl: z.string().default('http://localhost:8002'),
   orderServiceUrl: z.string().default('http://localhost:8003'),
   inventoryServiceUrl: z.string().default('http://localhost:8004'),
-  paymentServiceUrl: z.string().default('http://localhost:8005')
+  paymentServiceUrl: z.string().default('http://localhost:8005'),
+  notificationServiceUrl: z.string().default('http://localhost:8006')
 });
 
 export const config = configSchema.parse({
@@ -24,5 +25,6 @@ export const config = configSchema.parse({
   catalogServiceUrl: process.env.CATALOG_SERVICE_URL || 'http://localhost:8002',
   orderServiceUrl: process.env.ORDER_SERVICE_URL || 'http://localhost:8003',
   inventoryServiceUrl: process.env.INVENTORY_SERVICE_URL || 'http://localhost:8004',
-  paymentServiceUrl: process.env.PAYMENT_SERVICE_URL || 'http://localhost:8005'
+  paymentServiceUrl: process.env.PAYMENT_SERVICE_URL || 'http://localhost:8005',
+  notificationServiceUrl: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8006'
 });
