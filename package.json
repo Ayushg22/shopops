@@ -1,0 +1,42 @@
+{
+  "name": "shopops-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ShopOps - Cloud-Native E-Commerce Platform (DevOps, Cloud, GitOps, SRE & AIOps Laboratory)",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*",
+    "aiops/agent"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
+    "infra:up": "docker compose -f docker-compose.yml up -d",
+    "infra:down": "docker compose -f docker-compose.yml down",
+    "infra:logs": "docker compose -f docker-compose.yml logs -f"
+  },
+  "keywords": [
+    "devops",
+    "cloud-native",
+    "kubernetes",
+    "azure",
+    "aks",
+    "terraform",
+    "gitops",
+    "argocd",
+    "opentelemetry",
+    "sre",
+    "aiops"
+  ],
+  "author": "Ayush",
+  "license": "ISC",
+  "devDependencies": {
+    "prisma": "5.19.1"
+  },
+  "dependencies": {
+    "@prisma/client": "5.19.1"
+  }
+}

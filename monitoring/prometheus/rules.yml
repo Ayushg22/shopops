@@ -1,0 +1,5 @@
+groups:
+  - name: shopops_recording_rules
+    rules:
+      - record: job:http_requests_total:rate1m
+        expr: sum by (job, status) (rate(http_requests_total[1m]))

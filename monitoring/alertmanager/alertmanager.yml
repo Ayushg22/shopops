@@ -1,0 +1,15 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+  receiver: 'aiops-webhook'
+
+receivers:
+  - name: 'aiops-webhook'
+    webhook_configs:
+      - url: 'http://localhost:8090/webhook/alerts'
+        send_resolved: true

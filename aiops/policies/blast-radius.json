@@ -1,0 +1,7 @@
+{
+  "maxConcurrentRemediations": 1,
+  "prohibitedServiceCombinations": [
+    ["auth-service", "api-gateway"]
+  ],
+  "autoRollbackOnVerificationFailure": true
+}

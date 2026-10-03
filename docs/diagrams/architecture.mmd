@@ -1,0 +1,10 @@
+flowchart TB
+    User --> Ingress --> Frontend
+    Frontend --> APIGateway
+    APIGateway --> AuthService
+    APIGateway --> CatalogService
+    APIGateway --> OrderService
+    APIGateway --> InventoryService
+    APIGateway --> PaymentService
+    OrderService --> RabbitMQ
+    RabbitMQ --> NotificationService

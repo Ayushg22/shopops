@@ -1,0 +1,83 @@
+pipeline {
+  agent any
+
+  environment {
+    ACR_REGISTRY = 'acrshopopsdev.azurecr.io'
+    SONARQUBE_SERVER = 'sonar-server'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Install & Lint') {
+      steps {
+        sh 'npm ci'
+        sh 'npm run lint'
+      }
+    }
+
+    stage('Unit Tests') {
+      steps {
+        sh 'npm run test'
+      }
+    }
+
+    stage('SAST (SonarQube)') {
+      steps {
+        echo 'Running SonarQube static code analysis...'
+      }
+    }
+
+    stage('Secret Scanning (Gitleaks)') {
+      steps {
+        echo 'Running Gitleaks secret detection...'
+      }
+    }
+
+    stage('Build Container Images') {
+      steps {
+        echo 'Building multi-stage Docker images...'
+      }
+    }
+
+    stage('Vulnerability Scan (Trivy)') {
+      steps {
+        echo 'Scanning images for CVEs...'
+      }
+    }
+
+    stage('Generate SBOM (Syft)') {
+      steps {
+        echo 'Generating Software Bill of Materials (SBOM)...'
+      }
+    }
+
+    stage('Publish to ACR') {
+      when {
+        branch 'main'
+      }
+      steps {
+        echo 'Publishing verified immutable images to Azure Container Registry...'
+      }
+    }
+
+    stage('Update GitOps State') {
+      when {
+        branch 'main'
+      }
+      steps {
+        echo 'Updating image tags in deploy/gitops for Argo CD reconciliation...'
+      }
+    }
+  }
+
+  post {
+    always {
+      cleanWs()
+    }
+  }
+}

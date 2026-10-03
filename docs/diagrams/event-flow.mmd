@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant User
+    participant Gateway as API Gateway
+    participant Order as Order Service
+    participant MQ as RabbitMQ
+    participant Inv as Inventory Service
+    participant Pay as Payment Service
+    participant Notif as Notification Service
+
+    User->>Gateway: POST /orders
+    Gateway->>Order: Create Order
+    Order->>MQ: publish order.created
+    MQ->>Inv: consume order.created
+    Inv->>MQ: publish inventory.reserved
+    MQ->>Pay: consume inventory.reserved
+    Pay->>MQ: publish payment.completed
+    MQ->>Order: update status (COMPLETED)
+    MQ->>Notif: send customer receipt

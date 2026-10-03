@@ -1,0 +1,3 @@
+# Environment overrides for PROD
+global:
+  environment: prod

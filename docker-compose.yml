@@ -1,0 +1,147 @@
+services:
+  # ----------------------------------------------------------------------------
+  # PostgreSQL (Logical DB ownership for Microservices)
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: shopops-postgres
+    environment:
+      POSTGRES_USER: shopops
+      POSTGRES_PASSWORD: shopops_dev_secret
+      POSTGRES_MULTIPLE_DATABASES: shopops_auth,shopops_catalog,shopops_order,shopops_inventory,shopops_payment
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/local/init-multi-postgres.sh:/docker-entrypoint-initdb.d/init-multi-postgres.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shopops"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # Redis Cache
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: shopops-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # RabbitMQ Message Broker
+  # ----------------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: shopops-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # OpenTelemetry Collector
+  # ----------------------------------------------------------------------------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.98.0
+    container_name: shopops-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./monitoring/otel-collector/otel-collector-config.yml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus metrics exporter
+
+  # ----------------------------------------------------------------------------
+  # Prometheus (Metrics)
+  # ----------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: shopops-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+
+  # ----------------------------------------------------------------------------
+  # Alertmanager
+  # ----------------------------------------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: shopops-alertmanager
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+
+  # ----------------------------------------------------------------------------
+  # Grafana (Dashboards)
+  # ----------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: shopops-grafana
+    volumes:
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3001:3000"
+
+  # ----------------------------------------------------------------------------
+  # Loki (Logs)
+  # ----------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:2.9.6
+    container_name: shopops-loki
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+
+  # ----------------------------------------------------------------------------
+  # Tempo (Distributed Tracing)
+  # ----------------------------------------------------------------------------
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: shopops-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./monitoring/tempo/tempo-config.yml:/etc/tempo.yaml
+    ports:
+      - "3200:3200"
+      - "4317"
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:

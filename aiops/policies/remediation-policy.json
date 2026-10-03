@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "allowedEnvironments": ["dev", "staging", "lab"],
+  "prohibitedEnvironments": [],
+  "allowedActions": [
+    "restartDeployment",
+    "rollbackDeployment",
+    "scaleDeployment",
+    "pauseRollout"
+  ],
+  "allowedServices": [
+    "api-gateway",
+    "auth-service",
+    "catalog-service",
+    "order-service",
+    "inventory-service",
+    "payment-service",
+    "notification-service"
+  ],
+  "maxScaleReplicas": 5,
+  "cooldownMinutes": 10,
+  "requireAuditRecord": true
+}
