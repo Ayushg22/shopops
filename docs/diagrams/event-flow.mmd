@@ -1,18 +1,45 @@
 sequenceDiagram
-    participant User
-    participant Gateway as API Gateway
-    participant Order as Order Service
-    participant MQ as RabbitMQ
-    participant Inv as Inventory Service
-    participant Pay as Payment Service
-    participant Notif as Notification Service
+    autonumber
+    actor Customer as User / Frontend
+    participant GW as API Gateway (8000)
+    participant Ord as Order Service (8003)
+    participant RMQ as RabbitMQ (shopops.events)
+    participant Inv as Inventory Service (8004)
+    participant Pay as Payment Service (8005)
+    participant Notif as Notification Service (8006)
+    participant Redis as Redis (Customer Inbox)
 
-    User->>Gateway: POST /orders
-    Gateway->>Order: Create Order
-    Order->>MQ: publish order.created
-    MQ->>Inv: consume order.created
-    Inv->>MQ: publish inventory.reserved
-    MQ->>Pay: consume inventory.reserved
-    Pay->>MQ: publish payment.completed
-    MQ->>Order: update status (COMPLETED)
-    MQ->>Notif: send customer receipt
+    Customer->>GW: POST /api/v1/orders (Items, CustomerId)
+    GW->>Ord: Proxy POST /api/v1/orders (x-correlation-id)
+    Ord->>Ord: Persist Order (Status: PENDING)
+    Ord-->>GW: 201 Created (OrderId, Status: PENDING)
+    GW-->>Customer: 201 Created
+
+    Ord->>RMQ: Publish order.created
+    par Async Saga Execution
+        RMQ->>Inv: Deliver order.created
+        Inv->>Inv: Reserve Stock (decrement available, increment reserved)
+        Inv->>RMQ: Publish inventory.reserved
+    and Notification
+        RMQ->>Notif: Deliver order.created
+        Notif->>Redis: LPUSH inbox:customerId ("Order Received")
+    end
+
+    RMQ->>Pay: Deliver inventory.reserved
+    Pay->>Pay: Authorize Transaction (Generate tx-ref)
+    Pay->>RMQ: Publish payment.completed
+
+    par Order Completion
+        RMQ->>Ord: Deliver payment.completed
+        Ord->>Ord: Update Order (Status: COMPLETED)
+    and Inventory Finalization
+        RMQ->>Inv: Deliver payment.completed
+        Inv->>Inv: Commit Stock (decrement reserved)
+    and Customer Notification
+        RMQ->>Notif: Deliver payment.completed
+        Notif->>Redis: LPUSH inbox:customerId ("Payment Succeeded, Order Confirmed")
+    end
+
+    Customer->>GW: GET /api/v1/orders/:orderId
+    GW->>Ord: Proxy GET
+    Ord-->>Customer: 200 OK (Status: COMPLETED)

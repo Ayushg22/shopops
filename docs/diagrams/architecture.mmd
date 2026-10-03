@@ -1,10 +1,73 @@
 flowchart TB
-    User --> Ingress --> Frontend
-    Frontend --> APIGateway
-    APIGateway --> AuthService
-    APIGateway --> CatalogService
-    APIGateway --> OrderService
-    APIGateway --> InventoryService
-    APIGateway --> PaymentService
-    OrderService --> RabbitMQ
-    RabbitMQ --> NotificationService
+    subgraph Client["Client Tier"]
+        Browser["User Browser"]
+    end
+
+    subgraph Edge["Ingress & Presentation Tier"]
+        FE["Frontend SPA (Port 8080)<br/>React 18 / Nginx"]
+        GW["API Gateway (Port 8000)<br/>Express Proxy / JWT / Tracing"]
+    end
+
+    subgraph Services["Core Microservices Tier"]
+        Auth["auth-service (8001)<br/>Node.js / Express"]
+        Catalog["catalog-service (8002)<br/>Node.js / Express"]
+        Order["order-service (8003)<br/>Node.js / Express"]
+        Inventory["inventory-service (8004)<br/>Node.js / Express"]
+        Payment["payment-service (8005)<br/>Node.js / Express"]
+        Notif["notification-service (8006)<br/>Node.js / Express"]
+    end
+
+    subgraph Data["Persistence & Event Tier"]
+        DB_Auth[("PostgreSQL<br/>shopops_auth")]
+        DB_Catalog[("PostgreSQL<br/>shopops_catalog")]
+        DB_Order[("PostgreSQL<br/>shopops_order")]
+        DB_Inventory[("PostgreSQL<br/>shopops_inventory")]
+        DB_Payment[("PostgreSQL<br/>shopops_payment")]
+        Broker{{"RabbitMQ 3.13<br/>Exchange: shopops.events"}}
+        Cache[("Redis 7.2<br/>Inboxes & Sessions")]
+    end
+
+    subgraph Observability["Observability & Telemetry Backbone"]
+        OTel["OTel Collector (4317/4318)"]
+        Prom["Prometheus (9090)"]
+        Tempo["Grafana Tempo (3200)"]
+        Loki["Grafana Loki (3100)"]
+        Grafana["Grafana (3001)"]
+        Alerts["Alertmanager (9093)"]
+    end
+
+    Browser --> FE
+    Browser --> GW
+    FE --> GW
+
+    GW -->|/api/v1/auth| Auth
+    GW -->|/api/v1/products| Catalog
+    GW -->|/api/v1/orders| Order
+    GW -->|/api/v1/inventory| Inventory
+    GW -->|/api/v1/payments| Payment
+    GW -->|/api/v1/notifications| Notif
+
+    Auth --> DB_Auth
+    Catalog --> DB_Catalog
+    Order --> DB_Order
+    Inventory --> DB_Inventory
+    Payment --> DB_Payment
+    Notif --> Cache
+
+    Order -->|publish: order.created| Broker
+    Broker -->|subscribe: order.created| Inventory
+    Inventory -->|publish: inventory.reserved| Broker
+    Broker -->|subscribe: inventory.reserved| Payment
+    Payment -->|publish: payment.completed| Broker
+    Broker -->|subscribe: payment.completed| Order
+    Broker -->|subscribe: *.*| Notif
+
+    Services -.->|OTLP Spans / Metrics / Logs| OTel
+    GW -.->|OTLP| OTel
+    OTel --> Tempo
+    OTel --> Prom
+    OTel --> Loki
+    Prom --> Alerts
+    Grafana --> Prom
+    Grafana --> Tempo
+    Grafana --> Loki
