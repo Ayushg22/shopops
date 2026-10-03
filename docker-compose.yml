@@ -1,7 +1,9 @@
 services:
-  # ----------------------------------------------------------------------------
-  # PostgreSQL (Logical DB ownership for Microservices)
-  # ----------------------------------------------------------------------------
+  # ============================================================================
+  # 1. Backing Infrastructure Services
+  # ============================================================================
+
+  # PostgreSQL (Logical multi-tenant DB ownership for Microservices)
   postgres:
     image: postgres:16-alpine
     container_name: shopops-postgres
@@ -19,10 +21,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
 
-  # ----------------------------------------------------------------------------
-  # Redis Cache
-  # ----------------------------------------------------------------------------
+  # Redis Cache & Notification Inbox
   redis:
     image: redis:7-alpine
     container_name: shopops-redis
@@ -35,10 +40,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
-  # ----------------------------------------------------------------------------
-  # RabbitMQ Message Broker
-  # ----------------------------------------------------------------------------
+  # RabbitMQ Message Broker (Topic Exchange)
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     container_name: shopops-rabbitmq
@@ -55,10 +63,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
 
-  # ----------------------------------------------------------------------------
   # OpenTelemetry Collector
-  # ----------------------------------------------------------------------------
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.98.0
     container_name: shopops-otel-collector
@@ -69,10 +80,13 @@ services:
       - "4317:4317" # OTLP gRPC
       - "4318:4318" # OTLP HTTP
       - "8889:8889" # Prometheus metrics exporter
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
-  # ----------------------------------------------------------------------------
-  # Prometheus (Metrics)
-  # ----------------------------------------------------------------------------
+  # Prometheus (Metrics Aggregation)
   prometheus:
     image: prom/prometheus:v2.51.0
     container_name: shopops-prometheus
@@ -86,10 +100,13 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
-  # ----------------------------------------------------------------------------
   # Alertmanager
-  # ----------------------------------------------------------------------------
   alertmanager:
     image: prom/alertmanager:v0.27.0
     container_name: shopops-alertmanager
@@ -97,10 +114,13 @@ services:
       - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
     ports:
       - "9093:9093"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
 
-  # ----------------------------------------------------------------------------
   # Grafana (Dashboards)
-  # ----------------------------------------------------------------------------
   grafana:
     image: grafana/grafana:10.4.1
     container_name: shopops-grafana
@@ -114,10 +134,13 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     ports:
       - "3001:3000"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
-  # ----------------------------------------------------------------------------
-  # Loki (Logs)
-  # ----------------------------------------------------------------------------
+  # Loki (Centralized Logs)
   loki:
     image: grafana/loki:2.9.6
     container_name: shopops-loki
@@ -125,10 +148,13 @@ services:
       - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
-  # ----------------------------------------------------------------------------
   # Tempo (Distributed Tracing)
-  # ----------------------------------------------------------------------------
   tempo:
     image: grafana/tempo:2.4.1
     container_name: shopops-tempo
@@ -138,6 +164,207 @@ services:
     ports:
       - "3200:3200"
       - "4317"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ============================================================================
+  # 2. Application Microservices (Weekend 4: Production Containerized Platform)
+  # ============================================================================
+
+  # Auth Service
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: shopops-auth-service
+    environment:
+      PORT: 8001
+      NODE_ENV: production
+      DATABASE_URL: postgresql://shopops:shopops_dev_secret@postgres:5432/shopops_auth?schema=public
+      JWT_SECRET: super_secure_jwt_secret_for_dev_mode_shopops
+      LOG_LEVEL: info
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Catalog Service
+  catalog-service:
+    build:
+      context: .
+      dockerfile: services/catalog-service/Dockerfile
+    container_name: shopops-catalog-service
+    environment:
+      PORT: 8002
+      NODE_ENV: production
+      DATABASE_URL: postgresql://shopops:shopops_dev_secret@postgres:5432/shopops_catalog?schema=public
+      LOG_LEVEL: info
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Order Service
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    container_name: shopops-order-service
+    environment:
+      PORT: 8003
+      NODE_ENV: production
+      DATABASE_URL: postgresql://shopops:shopops_dev_secret@postgres:5432/shopops_order?schema=public
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      LOG_LEVEL: info
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Inventory Service
+  inventory-service:
+    build:
+      context: .
+      dockerfile: services/inventory-service/Dockerfile
+    container_name: shopops-inventory-service
+    environment:
+      PORT: 8004
+      NODE_ENV: production
+      DATABASE_URL: postgresql://shopops:shopops_dev_secret@postgres:5432/shopops_inventory?schema=public
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      LOG_LEVEL: info
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Payment Service
+  payment-service:
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile
+    container_name: shopops-payment-service
+    environment:
+      PORT: 8005
+      NODE_ENV: production
+      DATABASE_URL: postgresql://shopops:shopops_dev_secret@postgres:5432/shopops_payment?schema=public
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      LOG_LEVEL: info
+    ports:
+      - "8005:8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Notification Service
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: shopops-notification-service
+    environment:
+      PORT: 8006
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      LOG_LEVEL: info
+    ports:
+      - "8006:8006"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: shopops-api-gateway
+    environment:
+      PORT_API_GATEWAY: 8000
+      NODE_ENV: production
+      LOG_LEVEL: info
+      AUTH_SERVICE_URL: http://auth-service:8001
+      CATALOG_SERVICE_URL: http://catalog-service:8002
+      ORDER_SERVICE_URL: http://order-service:8003
+      INVENTORY_SERVICE_URL: http://inventory-service:8004
+      PAYMENT_SERVICE_URL: http://payment-service:8005
+      NOTIFICATION_SERVICE_URL: http://notification-service:8006
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth-service
+      - catalog-service
+      - order-service
+      - inventory-service
+      - payment-service
+      - notification-service
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Frontend Web Application (React SPA + Nginx)
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: shopops-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - api-gateway
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
 
 volumes:
   postgres_data:

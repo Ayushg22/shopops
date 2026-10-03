@@ -1,17 +1,39 @@
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-COPY tsconfig*.json ./
-RUN npm ci
-COPY src/ ./src/
-RUN npm run build
+# Stage 1: Build stage
+FROM node:20-slim AS builder
 
-FROM node:20-alpine AS runner
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
+RUN npm ci
+RUN npx prisma generate --schema=services/catalog-service/prisma/schema.prisma
+RUN npm run build -w @shopops/config && \
+    npm run build -w @shopops/logger && \
+    npm run build -w @shopops/shared-types && \
+    npm run build -w @shopops/observability && \
+    npm run build -w @shopops/catalog-service
+
+# Stage 2: Production runtime stage
+FROM node:20-slim AS runner
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y openssl curl && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production
+
 USER node
-COPY package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app/dist ./dist
+
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/packages ./packages
+COPY --from=builder --chown=node:node /app/services/catalog-service/dist ./services/catalog-service/dist
+COPY --from=builder --chown=node:node /app/services/catalog-service/package.json ./services/catalog-service/package.json
+
 EXPOSE 8002
-CMD ["node", "dist/app.js"]
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8002/health/live || exit 1
+
+CMD ["node", "services/catalog-service/dist/app.js"]
